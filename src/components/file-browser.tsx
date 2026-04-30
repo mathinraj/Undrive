@@ -339,15 +339,14 @@ export function FileBrowser() {
                     toggleSelect(file.id);
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 opacity-0 group-hover:opacity-100 data-[state=checked]:opacity-100 accent-violet-500"
-                  style={{ opacity: isSelected ? 1 : undefined }}
+                  className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 accent-violet-500"
                 />
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none"
+                    className="absolute top-1 right-1 h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical className="h-3.5 w-3.5" />
+                    <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
@@ -427,10 +426,10 @@ export function FileBrowser() {
                 </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none"
+                    className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical className="h-3.5 w-3.5" />
+                    <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
