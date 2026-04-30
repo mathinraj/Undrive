@@ -10,13 +10,23 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Folder, FolderPlus, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Folder, FolderPlus, Plus, Trash2, Upload } from "lucide-react";
 import { useVaultStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
-export function FolderSidebar({ className }: { className?: string }) {
-  const { folders, currentFolder, setCurrentFolder, files, setFiles } =
-    useVaultStore();
+interface FolderSidebarProps {
+  className?: string;
+  onUploadClick?: () => void;
+}
+
+export function FolderSidebar({ className, onUploadClick }: FolderSidebarProps) {
+  const { folders, currentFolder, setCurrentFolder, files } = useVaultStore();
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
@@ -24,7 +34,8 @@ export function FolderSidebar({ className }: { className?: string }) {
     const name = newFolderName.trim();
     if (!name) return;
 
-    const path = currentFolder === "/" ? `/${name}` : `${currentFolder}/${name}`;
+    const path =
+      currentFolder === "/" ? `/${name}` : `${currentFolder}/${name}`;
 
     if (!folders.includes(path)) {
       useVaultStore.setState({ folders: [...folders, path].sort() });
@@ -39,9 +50,8 @@ export function FolderSidebar({ className }: { className?: string }) {
     const filesInFolder = files.filter(
       (f) => f.appProperties?.folder === folder
     );
-    if (filesInFolder.length > 0) {
-      return;
-    }
+    if (filesInFolder.length > 0) return;
+
     useVaultStore.setState({
       folders: folders.filter((f) => f !== folder),
     });
@@ -53,18 +63,34 @@ export function FolderSidebar({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex flex-col gap-1 p-3", className)}>
-      <div className="flex items-center justify-between mb-2">
+      {/* New button — Google Drive style */}
+      <DropdownMenu>
+        <DropdownMenuTrigger className="mb-3 flex h-10 w-full items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-medium text-white shadow-md hover:bg-violet-700 transition-colors cursor-pointer outline-none">
+          <Plus className="h-5 w-5" />
+          New
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem
+            onClick={() => onUploadClick?.()}
+            className="gap-2 cursor-pointer"
+          >
+            <Upload className="h-4 w-4" />
+            Upload file
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setShowNewFolder(true)}
+            className="gap-2 cursor-pointer"
+          >
+            <FolderPlus className="h-4 w-4" />
+            New folder
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
           Folders
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => setShowNewFolder(true)}
-        >
-          <FolderPlus className="h-3.5 w-3.5" />
-        </Button>
       </div>
 
       {folders.map((folder) => (

@@ -6,9 +6,13 @@ import { useRouter } from "next/navigation";
 import { VaultHeader } from "@/components/vault-header";
 import { FolderSidebar } from "@/components/folder-sidebar";
 import { FileBrowser } from "@/components/file-browser";
-import { UploadZone } from "@/components/upload-zone";
+import {
+  useFileUpload,
+  DropOverlay,
+  UploadProgress,
+} from "@/components/upload-zone";
+import { FabMenu } from "@/components/fab-menu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { listFiles, getStorageQuota } from "@/lib/drive";
 import { useVaultStore } from "@/lib/store";
@@ -19,6 +23,7 @@ export default function VaultPage() {
   const router = useRouter();
   const { setFiles, setQuota, isLoading, setIsLoading } = useVaultStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { openFilePicker, processFiles, HiddenInput } = useFileUpload();
 
   const loadVault = useCallback(async () => {
     if (!session?.accessToken) return;
@@ -75,23 +80,35 @@ export default function VaultPage() {
       <div className="flex flex-1">
         {/* Desktop sidebar */}
         <aside className="hidden lg:block w-56 border-r shrink-0">
-          <FolderSidebar />
+          <FolderSidebar onUploadClick={openFilePicker} />
         </aside>
 
         {/* Mobile sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="w-64 p-0">
-            <FolderSidebar className="mt-8" />
+            <FolderSidebar className="mt-8" onUploadClick={() => {
+              setSidebarOpen(false);
+              setTimeout(openFilePicker, 200);
+            }} />
           </SheetContent>
         </Sheet>
 
-        {/* Main content */}
-        <main className="flex-1 p-4 lg:p-6 space-y-6 overflow-auto">
-          <UploadZone />
-          <Separator />
-          <FileBrowser />
-        </main>
+        {/* Main content with drag-and-drop overlay */}
+        <DropOverlay processFiles={processFiles}>
+          <main className="p-4 lg:p-6 space-y-4 overflow-auto min-h-[calc(100vh-3.5rem)]">
+            <FileBrowser />
+          </main>
+        </DropOverlay>
       </div>
+
+      {/* Hidden file input */}
+      {HiddenInput}
+
+      {/* Mobile FAB */}
+      <FabMenu onUploadClick={openFilePicker} />
+
+      {/* Upload progress toast */}
+      <UploadProgress />
     </div>
   );
 }
