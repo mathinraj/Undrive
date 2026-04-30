@@ -13,8 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EyeOff, Settings, LogOut, Sun, Moon, Menu } from "lucide-react";
+import { EyeOff, Settings, LogOut, Sun, Moon, Menu, Lock } from "lucide-react";
 import { useVaultStore } from "@/lib/store";
+import { usePasscodeStore } from "@/lib/passcode";
 import { formatFileSize } from "@/lib/file-utils";
 import { Progress } from "@/components/ui/progress";
 
@@ -23,6 +24,8 @@ export function VaultHeader({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { theme, setTheme } = useTheme();
   const quota = useVaultStore((s) => s.quota);
   const router = useRouter();
+  const passcodeConfig = usePasscodeStore((s) => s.config);
+  const lockVault = usePasscodeStore((s) => s.lock);
 
   const user = session?.user;
   const initials = user?.name
@@ -63,6 +66,12 @@ export function VaultHeader({ onMenuToggle }: { onMenuToggle?: () => void }) {
               {formatFileSize(quota.usage)} / {formatFileSize(quota.limit)}
             </span>
           </div>
+        )}
+
+        {passcodeConfig?.enabled && (
+          <Button variant="ghost" size="icon" onClick={lockVault}>
+            <Lock className="h-4 w-4" />
+          </Button>
         )}
 
         <Button

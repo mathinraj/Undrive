@@ -4,6 +4,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { usePasscodeStore } from "@/lib/passcode";
+import { useAutoLock } from "@/lib/use-auto-lock";
+import { LockScreen } from "@/components/lock-screen";
 
 export default function VaultLayout({
   children,
@@ -12,6 +15,15 @@ export default function VaultLayout({
 }) {
   const { status } = useSession();
   const router = useRouter();
+  const initialize = usePasscodeStore((s) => s.initialize);
+  const isLocked = usePasscodeStore((s) => s.isLocked);
+  const config = usePasscodeStore((s) => s.config);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  useAutoLock();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -28,6 +40,10 @@ export default function VaultLayout({
   }
 
   if (status === "unauthenticated") return null;
+
+  if (config?.enabled && isLocked) {
+    return <LockScreen />;
+  }
 
   return <>{children}</>;
 }
