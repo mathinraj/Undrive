@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,6 +24,7 @@ import {
   Upload,
   HardDrive,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { useVaultStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -36,7 +38,7 @@ export function FolderSidebar({
   className,
   onUploadClick,
 }: FolderSidebarProps) {
-  const { folders, currentFolder, setCurrentFolder, addFolder } =
+  const { folders, currentFolder, setCurrentFolder, addFolder, trash } =
     useVaultStore();
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -161,6 +163,24 @@ export function FolderSidebar({
 
       {/* Folder tree */}
       {renderFolder("/", 0)}
+
+      {/* Trash link */}
+      <div className="mt-4 pt-4 border-t">
+        <Link href="/vault/trash">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 h-8 px-2 text-sm"
+          >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span>Trash</span>
+            {trash.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {trash.length}
+              </span>
+            )}
+          </Button>
+        </Link>
+      </div>
 
       {/* New folder dialog */}
       <Dialog open={showNewFolder} onOpenChange={setShowNewFolder}>

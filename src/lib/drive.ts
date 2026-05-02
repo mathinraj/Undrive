@@ -1,6 +1,8 @@
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 
+const FOLDER_REGISTRY_NAME = ".undrive-folders.json";
+
 export interface DriveFile {
   id: string;
   name: string;
@@ -37,12 +39,12 @@ export async function listFiles(
       pageSize: "100",
     });
     if (pageToken) params.set("pageToken", pageToken);
+
+    const queries: string[] = [`name != '${FOLDER_REGISTRY_NAME}'`];
     if (folder) {
-      params.set(
-        "q",
-        `appProperties has { key='folder' and value='${folder}' }`
-      );
+      queries.push(`appProperties has { key='folder' and value='${folder}' }`);
     }
+    params.set("q", queries.join(" and "));
 
     const res = await fetch(`${DRIVE_API}/files?${params}`, {
       headers: headers(token),
@@ -213,10 +215,9 @@ export async function deleteFile(
 }
 
 export async function getStorageQuota(token: string): Promise<StorageQuota> {
-  const res = await fetch(
-    `${DRIVE_API}/about?fields=storageQuota`,
-    { headers: headers(token) }
-  );
+  const res = await fetch(`${DRIVE_API}/about?fields=storageQuota`, {
+    headers: headers(token),
+  });
 
   if (!res.ok) throw new Error("Failed to get storage quota");
 
@@ -250,4 +251,86 @@ export async function updateFileMetadata(
 
   if (!res.ok) throw new Error("Failed to update file");
   return res.json();
+}
+
+// --- Folder registry (persisted to appDataFolder) ---
+
+async function findRegistryFileId(token: string): Promise<string | null> {
+  const params = new URLSearchParams({
+    spaces: "appDataFolder",
+    q: `name = '${FOLDER_REGISTRY_NAME}'`,
+    fields: "files(id)",
+    pageSize: "1",
+  });
+
+  const res = await fetch(`${DRIVE_API}/files?${params}`, {
+    headers: headers(token),
+  });
+
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.files?.[0]?.id ?? null;
+}
+
+export async function loadFolderRegistry(
+  token: string
+): Promise<string[]> {
+  const fileId = await findRegistryFileId(token);
+  if (!fileId) return ["/"];
+
+  const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+    headers: headers(token),
+  });
+
+  if (!res.ok) return ["/"];
+
+  try {
+    const data = await res.json();
+    return Array.isArray(data.folders) ? data.folders : ["/"];
+  } catch {
+    return ["/"];
+  }
+}
+
+export async function saveFolderRegistry(
+  token: string,
+  folders: string[]
+): Promise<void> {
+  const body = JSON.stringify({ folders });
+  const fileId = await findRegistryFileId(token);
+
+  if (fileId) {
+    const form = new FormData();
+    form.append("file", new Blob([body], { type: "application/json" }));
+
+    await fetch(
+      `${UPLOAD_API}/files/${fileId}?uploadType=multipart`,
+      {
+        method: "PATCH",
+        headers: headers(token),
+        body: form,
+      }
+    );
+  } else {
+    const form = new FormData();
+    form.append(
+      "metadata",
+      new Blob(
+        [
+          JSON.stringify({
+            name: FOLDER_REGISTRY_NAME,
+            parents: ["appDataFolder"],
+          }),
+        ],
+        { type: "application/json" }
+      )
+    );
+    form.append("file", new Blob([body], { type: "application/json" }));
+
+    await fetch(`${UPLOAD_API}/files?uploadType=multipart`, {
+      method: "POST",
+      headers: headers(token),
+      body: form,
+    });
+  }
 }

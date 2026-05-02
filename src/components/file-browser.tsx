@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -31,11 +32,12 @@ import {
   Loader2,
   Folder,
   ChevronRight,
+  Copy,
 } from "lucide-react";
 import { useVaultStore, type SortField } from "@/lib/store";
 import type { DriveFile } from "@/lib/drive";
 import {
-  deleteFile,
+  deleteFile as driveDeleteFile,
   downloadFile,
   updateFileMetadata,
 } from "@/lib/drive";
@@ -67,6 +69,9 @@ export function FileBrowser() {
     setSortOrder,
     removeFile,
     removeFolder,
+    moveToTrash,
+    moveFolderTo,
+    copyFolderTo,
   } = store;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -80,14 +85,23 @@ export function FileBrowser() {
     fileName: string;
   } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState(false);
+  const [moveFolderTarget, setMoveFolderTarget] = useState<{
+    path: string;
+    mode: "move" | "copy";
+  } | null>(null);
 
-  // Child folders of current directory
+  // Drag state for folder drag-to-breadcrumb
+  const [draggedFolder, setDraggedFolder] = useState<string | null>(null);
+  const [breadcrumbDropTarget, setBreadcrumbDropTarget] = useState<
+    string | null
+  >(null);
+
   const childFolders = useMemo(
     () => store.getChildFolders(currentFolder),
     [store, currentFolder, folders]
   );
 
-  // Files directly in current folder (not in sub-folders)
   const currentFiles = useMemo(() => {
     let result = files.filter(
       (f) => (f.appProperties?.folder || "/") === currentFolder
@@ -119,17 +133,14 @@ export function FileBrowser() {
     return result;
   }, [files, currentFolder, searchQuery, sortField, sortOrder]);
 
-  // Filtered child folders (for search)
   const filteredFolders = useMemo(() => {
     if (!searchQuery) return childFolders;
     const q = searchQuery.toLowerCase();
-    return childFolders.filter((f) => {
-      const name = f.split("/").pop() || "";
-      return name.toLowerCase().includes(q);
-    });
+    return childFolders.filter((f) =>
+      (f.split("/").pop() || "").toLowerCase().includes(q)
+    );
   }, [childFolders, searchQuery]);
 
-  // Breadcrumb segments
   const breadcrumbs = useMemo(() => {
     if (currentFolder === "/") return [{ label: "My Drive", path: "/" }];
     const parts = currentFolder.split("/").filter(Boolean);
@@ -158,27 +169,38 @@ export function FileBrowser() {
   };
 
   const selectAll = () => {
-    if (selected.size === currentFiles.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(currentFiles.map((f) => f.id)));
-    }
+    if (selected.size === currentFiles.length) setSelected(new Set());
+    else setSelected(new Set(currentFiles.map((f) => f.id)));
   };
 
-  const handleDelete = async (ids: string[]) => {
+  // Trash files (soft delete)
+  const handleTrash = async (ids: string[]) => {
     if (!session?.accessToken) return;
     setDeleting(true);
     try {
-      await Promise.all(ids.map((id) => deleteFile(session.accessToken, id)));
-      ids.forEach((id) => removeFile(id));
+      const now = Date.now().toString();
+      await Promise.all(
+        ids.map((id) => {
+          const file = files.find((f) => f.id === id);
+          return updateFileMetadata(session.accessToken, id, {
+            appProperties: {
+              ...(file?.appProperties || {}),
+              trashed: "true",
+              trashedAt: now,
+              originalFolder: file?.appProperties?.folder || "/",
+            },
+          });
+        })
+      );
+      moveToTrash(ids);
       setSelected((prev) => {
         const next = new Set(prev);
         ids.forEach((id) => next.delete(id));
         return next;
       });
-      toast.success(`Deleted ${ids.length} file(s)`);
+      toast.success(`Moved ${ids.length} file(s) to trash`);
     } catch {
-      toast.error("Failed to delete some files");
+      toast.error("Failed to move to trash");
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -186,17 +208,41 @@ export function FileBrowser() {
     }
   };
 
-  const handleDeleteFolder = (folderPath: string) => {
-    const count = filesInFolder(folderPath);
-    if (count > 0) {
-      toast.error(
-        `Cannot delete folder — it contains ${count} file(s). Remove them first.`
-      );
-      return;
+  // Delete folder (with all contents → trash)
+  const handleDeleteFolder = async (folderPath: string) => {
+    if (!session?.accessToken) return;
+    setDeletingFolder(true);
+    try {
+      const folderFiles = files.filter((f) => {
+        const ff = f.appProperties?.folder || "/";
+        return ff === folderPath || ff.startsWith(folderPath + "/");
+      });
+
+      if (folderFiles.length > 0) {
+        const now = Date.now().toString();
+        await Promise.all(
+          folderFiles.map((f) =>
+            updateFileMetadata(session.accessToken, f.id, {
+              appProperties: {
+                ...f.appProperties,
+                trashed: "true",
+                trashedAt: now,
+                originalFolder: f.appProperties?.folder || "/",
+              },
+            })
+          )
+        );
+        moveToTrash(folderFiles.map((f) => f.id));
+      }
+
+      removeFolder(folderPath);
+      toast.success("Folder deleted");
+    } catch {
+      toast.error("Failed to delete folder");
+    } finally {
+      setDeletingFolder(false);
+      setFolderToDelete(null);
     }
-    removeFolder(folderPath);
-    toast.success("Folder deleted");
-    setFolderToDelete(null);
   };
 
   const handleDownloadFile = async (file: DriveFile) => {
@@ -216,8 +262,7 @@ export function FileBrowser() {
   };
 
   const handleBulkDownload = async () => {
-    const selectedFiles = files.filter((f) => selected.has(f.id));
-    for (const file of selectedFiles) {
+    for (const file of files.filter((f) => selected.has(f.id))) {
       await handleDownloadFile(file);
     }
   };
@@ -241,6 +286,103 @@ export function FileBrowser() {
     setMoveTarget(null);
   };
 
+  const handleMoveFolderConfirm = async (destination: string) => {
+    if (!moveFolderTarget || !session?.accessToken) return;
+    const { path, mode } = moveFolderTarget;
+
+    try {
+      if (mode === "move") {
+        const folderFiles = files.filter((f) => {
+          const ff = f.appProperties?.folder || "/";
+          return ff === path || ff.startsWith(path + "/");
+        });
+        const folderName = path.split("/").pop() || "";
+        const newPath =
+          destination === "/"
+            ? `/${folderName}`
+            : `${destination}/${folderName}`;
+
+        await Promise.all(
+          folderFiles.map((f) => {
+            const ff = f.appProperties?.folder || "/";
+            const newFolder =
+              ff === path ? newPath : newPath + ff.slice(path.length);
+            return updateFileMetadata(session.accessToken, f.id, {
+              appProperties: { ...f.appProperties, folder: newFolder },
+            });
+          })
+        );
+        moveFolderTo(path, destination);
+        toast.success("Folder moved");
+      } else {
+        copyFolderTo(path, destination);
+        toast.success("Folder copied (files not duplicated)");
+      }
+    } catch {
+      toast.error(`Failed to ${mode} folder`);
+    }
+
+    setMoveFolderTarget(null);
+  };
+
+  // Drag folder to breadcrumb
+  const handleFolderDragStart = (e: React.DragEvent, folderPath: string) => {
+    e.dataTransfer.setData("text/plain", folderPath);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedFolder(folderPath);
+  };
+
+  const handleBreadcrumbDragOver = (e: React.DragEvent, crumbPath: string) => {
+    if (!draggedFolder) return;
+    if (draggedFolder === crumbPath) return;
+    if (crumbPath.startsWith(draggedFolder + "/")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setBreadcrumbDropTarget(crumbPath);
+  };
+
+  const handleBreadcrumbDrop = async (
+    e: React.DragEvent,
+    crumbPath: string
+  ) => {
+    e.preventDefault();
+    setBreadcrumbDropTarget(null);
+    const folderPath = e.dataTransfer.getData("text/plain");
+    if (!folderPath || folderPath === crumbPath) return;
+    if (crumbPath.startsWith(folderPath + "/")) return;
+
+    if (!session?.accessToken) return;
+
+    try {
+      const folderFiles = files.filter((f) => {
+        const ff = f.appProperties?.folder || "/";
+        return ff === folderPath || ff.startsWith(folderPath + "/");
+      });
+      const folderName = folderPath.split("/").pop() || "";
+      const newPath =
+        crumbPath === "/"
+          ? `/${folderName}`
+          : `${crumbPath}/${folderName}`;
+
+      await Promise.all(
+        folderFiles.map((f) => {
+          const ff = f.appProperties?.folder || "/";
+          const newFolder =
+            ff === folderPath ? newPath : newPath + ff.slice(folderPath.length);
+          return updateFileMetadata(session.accessToken, f.id, {
+            appProperties: { ...f.appProperties, folder: newFolder },
+          });
+        })
+      );
+      moveFolderTo(folderPath, crumbPath);
+      toast.success(`Moved folder to ${crumbPath === "/" ? "My Drive" : crumbPath}`);
+    } catch {
+      toast.error("Failed to move folder");
+    }
+
+    setDraggedFolder(null);
+  };
+
   const handleFileClick = (file: DriveFile) => {
     if (isPreviewable(file.mimeType)) {
       setPreviewFile(file);
@@ -253,8 +395,7 @@ export function FileBrowser() {
   const cycleSortField = () => {
     const fields: SortField[] = ["name", "createdTime", "size"];
     const idx = fields.indexOf(sortField);
-    const next = fields[(idx + 1) % fields.length];
-    setSortField(next);
+    setSortField(fields[(idx + 1) % fields.length]);
   };
 
   const sortLabel: Record<SortField, string> = {
@@ -265,15 +406,16 @@ export function FileBrowser() {
 
   const isEmpty = filteredFolders.length === 0 && currentFiles.length === 0;
 
-  // All folders for the "move to" dialog (excluding the file's current folder)
-  const allFolderPaths = useMemo(() => {
-    return folders.filter((f) => f !== "/").concat(["/"]);
-  }, [folders]);
-
   return (
     <>
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1 text-sm overflow-x-auto pb-1">
+      <div
+        className="flex items-center gap-1 text-sm overflow-x-auto pb-1"
+        onDragEnd={() => {
+          setDraggedFolder(null);
+          setBreadcrumbDropTarget(null);
+        }}
+      >
         {breadcrumbs.map((crumb, i) => (
           <div key={crumb.path} className="flex items-center gap-1 shrink-0">
             {i > 0 && (
@@ -281,11 +423,16 @@ export function FileBrowser() {
             )}
             <button
               onClick={() => setCurrentFolder(crumb.path)}
+              onDragOver={(e) => handleBreadcrumbDragOver(e, crumb.path)}
+              onDragLeave={() => setBreadcrumbDropTarget(null)}
+              onDrop={(e) => handleBreadcrumbDrop(e, crumb.path)}
               className={cn(
                 "hover:text-foreground transition-colors px-1.5 py-0.5 rounded-md hover:bg-muted",
                 i === breadcrumbs.length - 1
                   ? "font-medium text-foreground"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground",
+                breadcrumbDropTarget === crumb.path &&
+                  "ring-2 ring-violet-500 bg-violet-500/10"
               )}
             >
               {crumb.label}
@@ -335,42 +482,22 @@ export function FileBrowser() {
               </Button>
             </>
           )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={cycleSortField}
-          >
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={cycleSortField}>
             <ArrowUpDown className="h-3.5 w-3.5" />
             {sortLabel[sortField]}
           </Button>
-
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-            }
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
           >
             {sortOrder === "asc" ? "↑" : "↓"}
           </Button>
-
           <div className="flex rounded-md border">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-8 w-8 rounded-none rounded-l-md"
-              onClick={() => setViewMode("grid")}
-            >
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-none rounded-l-md" onClick={() => setViewMode("grid")}>
               <Grid3X3 className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-8 w-8 rounded-none rounded-r-md"
-              onClick={() => setViewMode("list")}
-            >
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-none rounded-r-md" onClick={() => setViewMode("list")}>
               <List className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -385,16 +512,14 @@ export function FileBrowser() {
           <p className="text-sm">Upload files or create a folder to get started</p>
         </div>
       )}
-
       {isEmpty && searchQuery && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
           <Search className="h-12 w-12 opacity-30" />
           <p className="text-lg font-medium">No results found</p>
-          <p className="text-sm">Try a different search term</p>
         </div>
       )}
 
-      {/* Folders section */}
+      {/* Folders */}
       {filteredFolders.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
@@ -402,14 +527,20 @@ export function FileBrowser() {
           </h3>
           {viewMode === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {filteredFolders.map((folderPath) => {
-                const name = folderPath.split("/").pop() || "";
-                const count = filesInFolder(folderPath);
+              {filteredFolders.map((fp) => {
+                const name = fp.split("/").pop() || "";
+                const count = filesInFolder(fp);
                 return (
                   <div
-                    key={folderPath}
-                    className="group relative flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-colors hover:bg-muted/50"
-                    onClick={() => setCurrentFolder(folderPath)}
+                    key={fp}
+                    draggable
+                    onDragStart={(e) => handleFolderDragStart(e, fp)}
+                    onDragEnd={() => setDraggedFolder(null)}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-colors hover:bg-muted/50",
+                      draggedFolder === fp && "opacity-50"
+                    )}
+                    onClick={() => setCurrentFolder(fp)}
                   >
                     <Folder className="h-8 w-8 text-violet-400 shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -429,7 +560,26 @@ export function FileBrowser() {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            setFolderToDelete(folderPath);
+                            setMoveFolderTarget({ path: fp, mode: "move" });
+                          }}
+                          className="gap-2"
+                        >
+                          <FolderInput className="h-3.5 w-3.5" /> Move folder
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMoveFolderTarget({ path: fp, mode: "copy" });
+                          }}
+                          className="gap-2"
+                        >
+                          <Copy className="h-3.5 w-3.5" /> Copy folder
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFolderToDelete(fp);
                           }}
                           className="gap-2 text-destructive"
                         >
@@ -443,19 +593,23 @@ export function FileBrowser() {
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredFolders.map((folderPath) => {
-                const name = folderPath.split("/").pop() || "";
-                const count = filesInFolder(folderPath);
+              {filteredFolders.map((fp) => {
+                const name = fp.split("/").pop() || "";
+                const count = filesInFolder(fp);
                 return (
                   <div
-                    key={folderPath}
-                    className="group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50"
-                    onClick={() => setCurrentFolder(folderPath)}
+                    key={fp}
+                    draggable
+                    onDragStart={(e) => handleFolderDragStart(e, fp)}
+                    onDragEnd={() => setDraggedFolder(null)}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
+                      draggedFolder === fp && "opacity-50"
+                    )}
+                    onClick={() => setCurrentFolder(fp)}
                   >
                     <Folder className="h-5 w-5 shrink-0 text-violet-400" />
-                    <span className="flex-1 truncate text-sm font-medium">
-                      {name}
-                    </span>
+                    <span className="flex-1 truncate text-sm font-medium">{name}</span>
                     <span className="text-xs text-muted-foreground w-20 text-right">
                       {count} item{count !== 1 ? "s" : ""}
                     </span>
@@ -467,13 +621,14 @@ export function FileBrowser() {
                         <MoreVertical className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFolderToDelete(folderPath);
-                          }}
-                          className="gap-2 text-destructive"
-                        >
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMoveFolderTarget({ path: fp, mode: "move" }); }} className="gap-2">
+                          <FolderInput className="h-3.5 w-3.5" /> Move folder
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMoveFolderTarget({ path: fp, mode: "copy" }); }} className="gap-2">
+                          <Copy className="h-3.5 w-3.5" /> Copy folder
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setFolderToDelete(fp); }} className="gap-2 text-destructive">
                           <Trash2 className="h-3.5 w-3.5" /> Delete folder
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -486,30 +641,17 @@ export function FileBrowser() {
         </div>
       )}
 
-      {/* Files section */}
+      {/* Files */}
       {currentFiles.length > 0 && (
         <div className="space-y-2">
           {filteredFolders.length > 0 && (
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-              Files
-            </h3>
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Files</h3>
           )}
-
-          {/* Select all */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-xs"
-              onClick={selectAll}
-            >
-              {selected.size === currentFiles.length
-                ? "Deselect all"
-                : "Select all"}
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={selectAll}>
+              {selected.size === currentFiles.length ? "Deselect all" : "Select all"}
             </Button>
-            <span className="text-xs text-muted-foreground">
-              {currentFiles.length} file(s)
-            </span>
+            <span className="text-xs text-muted-foreground">{currentFiles.length} file(s)</span>
           </div>
 
           {viewMode === "grid" ? (
@@ -518,72 +660,22 @@ export function FileBrowser() {
                 const Icon = getFileIcon(file.mimeType);
                 const isSelected = selected.has(file.id);
                 return (
-                  <div
-                    key={file.id}
-                    className={cn(
-                      "group relative flex flex-col items-center gap-2 rounded-xl border p-4 cursor-pointer transition-colors hover:bg-muted/50",
-                      isSelected && "border-violet-500 bg-violet-500/5"
-                    )}
-                    onClick={() => handleFileClick(file)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(file.id);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 accent-violet-500"
-                    />
+                  <div key={file.id} className={cn("group relative flex flex-col items-center gap-2 rounded-xl border p-4 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-violet-500 bg-violet-500/5")} onClick={() => handleFileClick(file)}>
+                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 accent-violet-500" />
                     <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className="absolute top-1 right-1 h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <DropdownMenuTrigger className="absolute top-1 right-1 h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadFile(file);
-                          }}
-                          className="gap-2"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMoveTarget({
-                              fileId: file.id,
-                              fileName: file.name,
-                            });
-                          }}
-                          className="gap-2"
-                        >
-                          <FolderInput className="h-3.5 w-3.5" /> Move to folder
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTargets([file.id]);
-                            setShowDeleteConfirm(true);
-                          }}
-                          className="gap-2 text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadFile(file); }} className="gap-2"><Download className="h-3.5 w-3.5" /> Download</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMoveTarget({ fileId: file.id, fileName: file.name }); }} className="gap-2"><FolderInput className="h-3.5 w-3.5" /> Move to folder</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDeleteTargets([file.id]); setShowDeleteConfirm(true); }} className="gap-2 text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Icon className="h-10 w-10 text-muted-foreground" />
-                    <p className="text-xs text-center truncate w-full font-medium">
-                      {file.name}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatFileSize(file.size)}
-                    </p>
+                    <p className="text-xs text-center truncate w-full font-medium">{file.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
                   </div>
                 );
               })}
@@ -594,73 +686,21 @@ export function FileBrowser() {
                 const Icon = getFileIcon(file.mimeType);
                 const isSelected = selected.has(file.id);
                 return (
-                  <div
-                    key={file.id}
-                    className={cn(
-                      "group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50",
-                      isSelected && "border-violet-500 bg-violet-500/5"
-                    )}
-                    onClick={() => handleFileClick(file)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(file.id);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 shrink-0 accent-violet-500"
-                    />
+                  <div key={file.id} className={cn("group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-violet-500 bg-violet-500/5")} onClick={() => handleFileClick(file)}>
+                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="h-4 w-4 shrink-0 accent-violet-500" />
                     <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate text-sm font-medium">
-                      {file.name}
-                    </span>
-                    <span className="hidden sm:block text-xs text-muted-foreground w-20 text-right">
-                      {formatFileSize(file.size)}
-                    </span>
-                    <span className="hidden md:block text-xs text-muted-foreground w-28 text-right">
-                      {formatDate(file.createdTime)}
-                    </span>
+                    <span className="flex-1 truncate text-sm font-medium">{file.name}</span>
+                    <span className="hidden sm:block text-xs text-muted-foreground w-20 text-right">{formatFileSize(file.size)}</span>
+                    <span className="hidden md:block text-xs text-muted-foreground w-28 text-right">{formatDate(file.createdTime)}</span>
                     <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <DropdownMenuTrigger className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadFile(file);
-                          }}
-                          className="gap-2"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMoveTarget({
-                              fileId: file.id,
-                              fileName: file.name,
-                            });
-                          }}
-                          className="gap-2"
-                        >
-                          <FolderInput className="h-3.5 w-3.5" /> Move to folder
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTargets([file.id]);
-                            setShowDeleteConfirm(true);
-                          }}
-                          className="gap-2 text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadFile(file); }} className="gap-2"><Download className="h-3.5 w-3.5" /> Download</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMoveTarget({ fileId: file.id, fileName: file.name }); }} className="gap-2"><FolderInput className="h-3.5 w-3.5" /> Move to folder</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDeleteTargets([file.id]); setShowDeleteConfirm(true); }} className="gap-2 text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -671,112 +711,82 @@ export function FileBrowser() {
         </div>
       )}
 
-      {/* Preview dialog */}
-      <FilePreview
-        file={previewFile}
-        open={showPreview}
-        onOpenChange={setShowPreview}
-      />
+      <FilePreview file={previewFile} open={showPreview} onOpenChange={setShowPreview} />
 
-      {/* Delete file confirmation */}
+      {/* Trash file confirm */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              Delete {deleteTargets.length > 1 ? "files" : "file"}?
-            </DialogTitle>
+            <DialogTitle>Move to trash?</DialogTitle>
             <DialogDescription>
-              This action is permanent. Files in the hidden app folder cannot be
-              recovered from trash.
+              {deleteTargets.length} file(s) will be moved to trash. They will be automatically deleted after 7 days.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleting}
-              onClick={() => handleDelete(deleteTargets)}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => handleTrash(deleteTargets)} className="gap-2">
               {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Delete permanently
+              Move to trash
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete folder confirmation */}
-      <Dialog
-        open={!!folderToDelete}
-        onOpenChange={(open) => !open && setFolderToDelete(null)}
-      >
+      {/* Delete folder confirm */}
+      <Dialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete folder?</DialogTitle>
             <DialogDescription>
-              Delete &ldquo;{folderToDelete?.split("/").pop()}&rdquo;? The folder
-              must be empty.
+              Delete &ldquo;{folderToDelete?.split("/").pop()}&rdquo; and all its contents? Files will be moved to trash.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderToDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                folderToDelete && handleDeleteFolder(folderToDelete)
-              }
-            >
+            <Button variant="outline" onClick={() => setFolderToDelete(null)} disabled={deletingFolder}>Cancel</Button>
+            <Button variant="destructive" disabled={deletingFolder} onClick={() => folderToDelete && handleDeleteFolder(folderToDelete)} className="gap-2">
+              {deletingFolder && <Loader2 className="h-4 w-4 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Move to folder dialog */}
-      <Dialog
-        open={!!moveTarget}
-        onOpenChange={(open) => !open && setMoveTarget(null)}
-      >
+      {/* Move/copy folder dialog */}
+      <Dialog open={!!moveFolderTarget} onOpenChange={(open) => !open && setMoveFolderTarget(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              Move &ldquo;{moveTarget?.fileName}&rdquo;
+              {moveFolderTarget?.mode === "copy" ? "Copy" : "Move"} &ldquo;{moveFolderTarget?.path.split("/").pop()}&rdquo;
             </DialogTitle>
+            <DialogDescription>Select a destination.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 max-h-64 overflow-auto">
+            {["/", ...folders.filter((f) => f !== "/" && f !== moveFolderTarget?.path && !f.startsWith((moveFolderTarget?.path || "") + "/"))].map((f) => (
+              <Button key={f} variant="ghost" className="w-full justify-start gap-2" onClick={() => handleMoveFolderConfirm(f)}>
+                <Folder className="h-4 w-4 text-violet-400" />
+                {f === "/" ? "My Drive (root)" : f}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move file to folder dialog */}
+      <Dialog open={!!moveTarget} onOpenChange={(open) => !open && setMoveTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Move &ldquo;{moveTarget?.fileName}&rdquo;</DialogTitle>
             <DialogDescription>Select a destination folder.</DialogDescription>
           </DialogHeader>
           <div className="space-y-1 max-h-64 overflow-auto">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2"
-              onClick={() =>
-                moveTarget && handleMoveFile(moveTarget.fileId, "/")
-              }
-            >
-              <Folder className="h-4 w-4 text-violet-400" />
-              My Drive (root)
+            <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => moveTarget && handleMoveFile(moveTarget.fileId, "/")}>
+              <Folder className="h-4 w-4 text-violet-400" /> My Drive (root)
             </Button>
-            {allFolderPaths
-              .filter((f) => f !== "/")
-              .map((folder) => (
-                <Button
-                  key={folder}
-                  variant="ghost"
-                  className="w-full justify-start gap-2"
-                  onClick={() =>
-                    moveTarget && handleMoveFile(moveTarget.fileId, folder)
-                  }
-                >
-                  <Folder className="h-4 w-4 text-violet-400" />
-                  {folder}
-                </Button>
-              ))}
+            {folders.filter((f) => f !== "/").map((f) => (
+              <Button key={f} variant="ghost" className="w-full justify-start gap-2" onClick={() => moveTarget && handleMoveFile(moveTarget.fileId, f)}>
+                <Folder className="h-4 w-4 text-violet-400" /> {f}
+              </Button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
