@@ -42,9 +42,29 @@ interface VaultState {
   clearCompletedUploads: () => void;
   removeFile: (fileId: string) => void;
   addFile: (file: DriveFile) => void;
+  addFolder: (path: string) => void;
+  removeFolder: (path: string) => void;
+  getChildFolders: (parentPath: string) => string[];
+  getFilesInFolder: (folderPath: string) => DriveFile[];
 }
 
-export const useVaultStore = create<VaultState>((set) => ({
+function collectFolders(files: DriveFile[], existing: string[]): string[] {
+  const folderSet = new Set<string>(["/", ...existing]);
+  files.forEach((f) => {
+    const folder = f.appProperties?.folder || "/";
+    folderSet.add(folder);
+    // Also add parent folders in the path
+    const parts = folder.split("/").filter(Boolean);
+    let path = "";
+    for (const part of parts) {
+      path += `/${part}`;
+      folderSet.add(path);
+    }
+  });
+  return Array.from(folderSet).sort();
+}
+
+export const useVaultStore = create<VaultState>((set, get) => ({
   files: [],
   folders: ["/"],
   currentFolder: "/",
@@ -57,12 +77,8 @@ export const useVaultStore = create<VaultState>((set) => ({
   uploads: [],
 
   setFiles: (files) => {
-    const folderSet = new Set<string>(["/"]);
-    files.forEach((f) => {
-      const folder = f.appProperties?.folder || "/";
-      folderSet.add(folder);
-    });
-    set({ files, folders: Array.from(folderSet).sort() });
+    const folders = collectFolders(files, get().folders);
+    set({ files, folders });
   },
 
   setCurrentFolder: (folder) => set({ currentFolder: folder }),
@@ -94,11 +110,60 @@ export const useVaultStore = create<VaultState>((set) => ({
 
   addFile: (file) =>
     set((s) => {
-      const folderSet = new Set(s.folders);
-      folderSet.add(file.appProperties?.folder || "/");
+      const newFiles = [file, ...s.files];
       return {
-        files: [file, ...s.files],
-        folders: Array.from(folderSet).sort(),
+        files: newFiles,
+        folders: collectFolders(newFiles, s.folders),
       };
     }),
+
+  addFolder: (path: string) =>
+    set((s) => {
+      if (s.folders.includes(path)) return s;
+      const updated = [...s.folders, path];
+      // Also ensure parent folders exist
+      const parts = path.split("/").filter(Boolean);
+      let parent = "";
+      for (const part of parts) {
+        parent += `/${part}`;
+        if (!updated.includes(parent)) updated.push(parent);
+      }
+      return { folders: updated.sort() };
+    }),
+
+  removeFolder: (path: string) =>
+    set((s) => {
+      if (path === "/") return s;
+      // Remove this folder and all sub-folders
+      const updated = s.folders.filter(
+        (f) => f !== path && !f.startsWith(path + "/")
+      );
+      return {
+        folders: updated,
+        currentFolder: s.currentFolder === path || s.currentFolder.startsWith(path + "/")
+          ? "/"
+          : s.currentFolder,
+      };
+    }),
+
+  getChildFolders: (parentPath: string) => {
+    const { folders } = get();
+    return folders.filter((f) => {
+      if (f === parentPath || f === "/") return false;
+      if (parentPath === "/") {
+        // Direct children of root: folders like "/Documents" (no further slashes)
+        const withoutLeading = f.slice(1);
+        return !withoutLeading.includes("/");
+      }
+      // Direct children: starts with parent + "/" and has no more slashes after
+      if (!f.startsWith(parentPath + "/")) return false;
+      const remainder = f.slice(parentPath.length + 1);
+      return !remainder.includes("/");
+    });
+  },
+
+  getFilesInFolder: (folderPath: string) => {
+    const { files } = get();
+    return files.filter((f) => (f.appProperties?.folder || "/") === folderPath);
+  },
 }));

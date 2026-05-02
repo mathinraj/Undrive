@@ -22,7 +22,7 @@ export function FabMenu({ onUploadClick }: FabMenuProps) {
   const [open, setOpen] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const { folders, currentFolder } = useVaultStore();
+  const { currentFolder, addFolder } = useVaultStore();
 
   const handleCreateFolder = () => {
     const name = newFolderName.trim();
@@ -31,10 +31,7 @@ export function FabMenu({ onUploadClick }: FabMenuProps) {
     const path =
       currentFolder === "/" ? `/${name}` : `${currentFolder}/${name}`;
 
-    if (!folders.includes(path)) {
-      useVaultStore.setState({ folders: [...folders, path].sort() });
-    }
-
+    addFolder(path);
     setShowNewFolder(false);
     setNewFolderName("");
     setOpen(false);
