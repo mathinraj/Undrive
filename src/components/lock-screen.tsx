@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { EyeOff, Delete } from "lucide-react";
+import { Delete } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { usePasscodeStore } from "@/lib/passcode";
 import { cn } from "@/lib/utils";
 
@@ -64,9 +65,7 @@ export function LockScreen() {
       <div className="flex flex-col items-center gap-8 w-full max-w-xs px-4">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-500/10">
-            <EyeOff className="h-8 w-8 text-violet-500" />
-          </div>
+          <Logo size={64} className="rounded-xl" />
           <h1 className="text-xl font-bold tracking-tight">Undrive</h1>
           <p className="text-sm text-muted-foreground">
             Enter your PIN to unlock

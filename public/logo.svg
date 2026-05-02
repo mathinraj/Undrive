@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg4c" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#1E1042"/>
+    </linearGradient>
+    <filter id="drop4c">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bg4c)"/>
+
+  <!-- Folder - bold thick strokes -->
+  <g filter="url(#drop4c)">
+    <!-- Folder tab fill -->
+    <path d="M118 170v-20c0-14 11-24 24-24h66l34 34h132c14 0 24 10 24 24v0H118z"
+          fill="rgba(255,255,255,0.1)"/>
+    <!-- Folder body -->
+    <rect x="118" y="170" width="276" height="196" rx="18"
+          fill="rgba(255,255,255,0.06)" stroke="white" stroke-width="16" stroke-linejoin="round"/>
+    <!-- Folder tab outline -->
+    <path d="M118 186v-22c0-14 11-24 24-24h66l34 34"
+          fill="none" stroke="white" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+
+  <!-- Large, bold eye-off centered -->
+  <g transform="translate(256,278)">
+    <!-- Eye shape -->
+    <path d="M-54 0c0 0 22-32 54-32s54 32 54 32-22 32-54 32-54-32-54-32z"
+          fill="none" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Iris filled -->
+    <circle cx="0" cy="0" r="16" fill="white" opacity="0.95"/>
+    <!-- Bold slash -->
+    <line x1="-38" y1="28" x2="38" y2="-28" stroke="white" stroke-width="14" stroke-linecap="round"/>
+    <!-- Background-colored slash to "cut" the iris -->
+    <line x1="-38" y1="28" x2="38" y2="-28" stroke="#4A208A" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+    <!-- White slash on top again for crispness -->
+    <line x1="-38" y1="28" x2="38" y2="-28" stroke="white" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>

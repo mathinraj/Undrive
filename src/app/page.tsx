@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  EyeOff,
   Shield,
   HardDrive,
   LogIn,
   ArrowRight,
   ChevronDown,
   ExternalLink,
+  EyeOff,
 } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 export default function LandingPage() {
   const { data: session, status } = useSession();
@@ -35,7 +36,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto w-full">
         <div className="flex items-center gap-2">
-          <EyeOff className="h-6 w-6 text-violet-500" />
+          <Logo size={28} />
           <span className="text-xl font-bold tracking-tight">Undrive</span>
         </div>
         <Button
@@ -202,7 +203,7 @@ export default function LandingPage() {
       <footer className="border-t py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2">
-            <EyeOff className="h-4 w-4 text-violet-500" />
+            <Logo size={18} />
             <span className="text-sm font-medium">Undrive</span>
             <span className="text-sm text-muted-foreground">
               — Your Drive, unseen.

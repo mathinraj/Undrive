@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EyeOff, Settings, LogOut, Sun, Moon, Menu, Lock } from "lucide-react";
+import { Settings, LogOut, Sun, Moon, Menu, Lock } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { useVaultStore } from "@/lib/store";
 import { usePasscodeStore } from "@/lib/passcode";
 import { formatFileSize } from "@/lib/file-utils";
@@ -51,7 +52,7 @@ export function VaultHeader({ onMenuToggle }: { onMenuToggle?: () => void }) {
           <Menu className="h-5 w-5" />
         </Button>
         <Link href="/vault" className="flex items-center gap-2">
-          <EyeOff className="h-5 w-5 text-violet-500" />
+          <Logo size={24} />
           <span className="font-bold tracking-tight">Undrive</span>
         </Link>
       </div>

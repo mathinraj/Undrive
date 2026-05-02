@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Undrive — Your Drive, unseen.",
   description:
     "Store files in Google Drive's hidden folder. Invisible from Drive UI, accessible only through Undrive.",
+  icons: {
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({
