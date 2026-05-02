@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { VaultHeader } from "@/components/vault-header";
@@ -21,7 +21,6 @@ import {
   loadFolderRegistry,
   saveFolderRegistry,
   deleteFile as driveDeleteFile,
-  updateFileMetadata,
 } from "@/lib/drive";
 import { useVaultStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -33,34 +32,49 @@ export default function VaultPage() {
   const { setFiles, setQuota, isLoading, setIsLoading } = store;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { openFilePicker, processFiles, HiddenInput } = useFileUpload();
+  const hasLoadedRef = useRef(false);
+  const prevFoldersRef = useRef<string>("");
 
-  const loadVault = useCallback(async () => {
-    if (!session?.accessToken) return;
+  const loadVault = useCallback(async (token: string) => {
     setIsLoading(true);
     try {
       const [files, quota, savedFolders] = await Promise.all([
-        listFiles(session.accessToken),
-        getStorageQuota(session.accessToken),
-        loadFolderRegistry(session.accessToken),
+        listFiles(token),
+        getStorageQuota(token),
+        loadFolderRegistry(token),
       ]);
       setFiles(files, savedFolders);
       setQuota(quota);
     } catch (err) {
-      if (session.error === "RefreshAccessTokenError") {
-        toast.error("Session expired. Please sign in again.");
-        router.push("/");
-        return;
-      }
       toast.error("Failed to load vault");
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, [session, setFiles, setQuota, setIsLoading, router]);
+  }, [setFiles, setQuota, setIsLoading]);
 
-  // Auto-clean expired trash items (>7 days) on load
   useEffect(() => {
-    if (!session?.accessToken || isLoading) return;
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [status, router]);
+
+  // Load vault only once when we first get a valid token
+  useEffect(() => {
+    if (session?.accessToken && !hasLoadedRef.current) {
+      if (session.error === "RefreshAccessTokenError") {
+        toast.error("Session expired. Please sign in again.");
+        router.push("/");
+        return;
+      }
+      hasLoadedRef.current = true;
+      loadVault(session.accessToken);
+    }
+  }, [session?.accessToken, session?.error, loadVault, router]);
+
+  // Auto-clean expired trash items (>7 days) after initial load
+  useEffect(() => {
+    if (!session?.accessToken || isLoading || !hasLoadedRef.current) return;
     const expiredIds = useVaultStore.getState().cleanExpiredTrash();
     if (expiredIds.length > 0) {
       Promise.all(
@@ -69,26 +83,17 @@ export default function VaultPage() {
     }
   }, [session?.accessToken, isLoading]);
 
-  // Persist folders to Drive whenever they change
+  // Persist folders to Drive whenever they change (debounced by checking serialized value)
   useEffect(() => {
-    if (!session?.accessToken || isLoading) return;
+    if (!session?.accessToken || isLoading || !hasLoadedRef.current) return;
     const folders = useVaultStore.getState().folders;
+    const serialized = JSON.stringify(folders);
+    if (serialized === prevFoldersRef.current) return;
+    prevFoldersRef.current = serialized;
     saveFolderRegistry(session.accessToken, folders).catch(console.error);
   }, [store.folders, session?.accessToken, isLoading]);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (session?.accessToken) {
-      loadVault();
-    }
-  }, [session?.accessToken, loadVault]);
-
-  if (status === "loading" || isLoading) {
+  if (status === "loading" || (isLoading && !hasLoadedRef.current)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
