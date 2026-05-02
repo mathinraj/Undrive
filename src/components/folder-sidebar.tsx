@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,8 +37,16 @@ export function FolderSidebar({
   className,
   onUploadClick,
 }: FolderSidebarProps) {
-  const { folders, currentFolder, setCurrentFolder, addFolder, trash } =
-    useVaultStore();
+  const {
+    folders,
+    currentFolder,
+    setCurrentFolder,
+    addFolder,
+    trash,
+    trashedFolders,
+    activeView,
+    setActiveView,
+  } = useVaultStore();
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -49,10 +56,8 @@ export function FolderSidebar({
   const handleCreateFolder = () => {
     const name = newFolderName.trim();
     if (!name) return;
-
     const path =
       currentFolder === "/" ? `/${name}` : `${currentFolder}/${name}`;
-
     addFolder(path);
     setShowNewFolder(false);
     setNewFolderName("");
@@ -67,25 +72,22 @@ export function FolderSidebar({
     });
   };
 
-  const getChildFolders = (parentPath: string): string[] => {
-    return folders.filter((f) => {
+  const getChildFolders = (parentPath: string): string[] =>
+    folders.filter((f) => {
       if (f === parentPath || f === "/") return false;
       if (parentPath === "/") {
-        const withoutLeading = f.slice(1);
-        return !withoutLeading.includes("/");
+        return !f.slice(1).includes("/");
       }
       if (!f.startsWith(parentPath + "/")) return false;
-      const remainder = f.slice(parentPath.length + 1);
-      return !remainder.includes("/");
+      return !f.slice(parentPath.length + 1).includes("/");
     });
-  };
 
   const renderFolder = (path: string, depth: number) => {
     const name = path === "/" ? "My Drive" : path.split("/").pop() || "";
     const children = getChildFolders(path);
     const hasChildren = children.length > 0;
     const isExpanded = expandedFolders.has(path);
-    const isActive = currentFolder === path;
+    const isActive = activeView === "drive" && currentFolder === path;
 
     return (
       <div key={path}>
@@ -93,7 +95,6 @@ export function FolderSidebar({
           className="flex items-center group"
           style={{ paddingLeft: `${depth * 12}px` }}
         >
-          {/* Expand toggle */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -111,11 +112,13 @@ export function FolderSidebar({
               )}
             />
           </button>
-
           <Button
             variant={isActive ? "secondary" : "ghost"}
             className="flex-1 justify-start gap-2 h-8 px-2 text-sm"
-            onClick={() => setCurrentFolder(path)}
+            onClick={() => {
+              setActiveView("drive");
+              setCurrentFolder(path);
+            }}
           >
             {path === "/" ? (
               <HardDrive className="h-4 w-4 shrink-0" />
@@ -125,7 +128,6 @@ export function FolderSidebar({
             <span className="truncate">{name}</span>
           </Button>
         </div>
-
         {hasChildren && isExpanded && (
           <div>
             {children.map((child) => renderFolder(child, depth + 1))}
@@ -135,9 +137,10 @@ export function FolderSidebar({
     );
   };
 
+  const trashCount = trash.length + trashedFolders.length;
+
   return (
     <div className={cn("flex flex-col gap-1 p-3", className)}>
-      {/* New button */}
       <DropdownMenu>
         <DropdownMenuTrigger className="mb-3 flex h-10 w-full items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-medium text-white shadow-md hover:bg-violet-700 transition-colors cursor-pointer outline-none">
           <Plus className="h-5 w-5" />
@@ -161,28 +164,24 @@ export function FolderSidebar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Folder tree */}
       {renderFolder("/", 0)}
 
-      {/* Trash link */}
       <div className="mt-4 pt-4 border-t">
-        <Link href="/vault/trash">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 h-8 px-2 text-sm"
-          >
-            <Trash2 className="h-4 w-4 shrink-0" />
-            <span>Trash</span>
-            {trash.length > 0 && (
-              <span className="ml-auto text-xs text-muted-foreground">
-                {trash.length}
-              </span>
-            )}
-          </Button>
-        </Link>
+        <Button
+          variant={activeView === "trash" ? "secondary" : "ghost"}
+          className="w-full justify-start gap-2 h-8 px-2 text-sm"
+          onClick={() => setActiveView("trash")}
+        >
+          <Trash2 className="h-4 w-4 shrink-0" />
+          <span>Trash</span>
+          {trashCount > 0 && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              {trashCount}
+            </span>
+          )}
+        </Button>
       </div>
 
-      {/* New folder dialog */}
       <Dialog open={showNewFolder} onOpenChange={setShowNewFolder}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

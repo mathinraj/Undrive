@@ -6,11 +6,18 @@ import type { DriveFile, StorageQuota } from "./drive";
 export type ViewMode = "grid" | "list";
 export type SortField = "name" | "createdTime" | "size";
 export type SortOrder = "asc" | "desc";
+export type VaultView = "drive" | "trash";
 
 export interface TrashedItem {
   file: DriveFile;
   trashedAt: number;
   originalFolder: string;
+}
+
+export interface TrashedFolder {
+  path: string;
+  trashedAt: number;
+  fileIds: string[];
 }
 
 interface UploadItem {
@@ -34,8 +41,11 @@ interface VaultState {
   isLoading: boolean;
   uploads: UploadItem[];
   trash: TrashedItem[];
+  trashedFolders: TrashedFolder[];
+  activeView: VaultView;
+  selectedFile: DriveFile | null;
 
-  setFiles: (files: DriveFile[]) => void;
+  setFiles: (files: DriveFile[], savedFolders?: string[]) => void;
   setCurrentFolder: (folder: string) => void;
   setViewMode: (mode: ViewMode) => void;
   setSearchQuery: (query: string) => void;
@@ -54,15 +64,18 @@ interface VaultState {
   setFolders: (folders: string[]) => void;
   getChildFolders: (parentPath: string) => string[];
   getFilesInFolder: (folderPath: string) => DriveFile[];
+  setActiveView: (view: VaultView) => void;
+  setSelectedFile: (file: DriveFile | null) => void;
 
-  // Trash
   moveToTrash: (fileIds: string[]) => void;
+  trashFolder: (folderPath: string) => void;
   restoreFromTrash: (fileIds: string[]) => void;
+  restoreFolder: (folderPath: string) => void;
   permanentlyDelete: (fileIds: string[]) => void;
-  emptyTrash: () => string[];
+  permanentlyDeleteFolder: (folderPath: string) => void;
+  emptyTrash: () => { fileIds: string[] };
   cleanExpiredTrash: () => string[];
 
-  // Folder operations
   moveFolderTo: (folderPath: string, newParent: string) => void;
   copyFolderTo: (folderPath: string, newParent: string) => void;
 }
@@ -108,8 +121,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   isLoading: false,
   uploads: [],
   trash: [],
+  trashedFolders: [],
+  activeView: "drive",
+  selectedFile: null,
 
-  setFiles: (files) => {
+  setFiles: (files, savedFolders?) => {
     const activeFiles = files.filter(
       (f) => f.appProperties?.trashed !== "true"
     );
@@ -121,8 +137,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       trashedAt: parseInt(f.appProperties?.trashedAt || "0"),
       originalFolder: f.appProperties?.originalFolder || "/",
     }));
-    const folders = collectFolders(activeFiles, get().folders);
-    set({ files: activeFiles, folders, trash: trashItems });
+    const existingFolders = savedFolders || get().folders;
+    const folders = collectFolders(activeFiles, existingFolders);
+    set({ files: activeFiles, trash: trashItems, folders });
   },
 
   setCurrentFolder: (folder) => set({ currentFolder: folder }),
@@ -132,17 +149,16 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   setSortOrder: (order) => set({ sortOrder: order }),
   setQuota: (quota) => set({ quota }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+  setActiveView: (view) => set({ activeView: view, searchQuery: "" }),
+  setSelectedFile: (file) => set({ selectedFile: file }),
 
   addUpload: (item) => set((s) => ({ uploads: [...s.uploads, item] })),
-
   updateUpload: (id, partial) =>
     set((s) => ({
       uploads: s.uploads.map((u) => (u.id === id ? { ...u, ...partial } : u)),
     })),
-
   removeUpload: (id) =>
     set((s) => ({ uploads: s.uploads.filter((u) => u.id !== id) })),
-
   clearCompletedUploads: () =>
     set((s) => ({ uploads: s.uploads.filter((u) => u.status !== "done") })),
 
@@ -182,22 +198,17 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       return {
         folders: updated,
         currentFolder:
-          s.currentFolder === path ||
-          s.currentFolder.startsWith(path + "/")
+          s.currentFolder === path || s.currentFolder.startsWith(path + "/")
             ? "/"
             : s.currentFolder,
       };
     }),
 
-  getChildFolders: (parentPath: string) => {
-    return getChildFoldersFn(get().folders, parentPath);
-  },
+  getChildFolders: (parentPath: string) =>
+    getChildFoldersFn(get().folders, parentPath),
 
-  getFilesInFolder: (folderPath: string) => {
-    return get().files.filter(
-      (f) => (f.appProperties?.folder || "/") === folderPath
-    );
-  },
+  getFilesInFolder: (folderPath: string) =>
+    get().files.filter((f) => (f.appProperties?.folder || "/") === folderPath),
 
   // --- Trash ---
 
@@ -219,6 +230,45 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       return { files: remaining, trash: [...s.trash, ...toTrash] };
     }),
 
+  trashFolder: (folderPath: string) =>
+    set((s) => {
+      const now = Date.now();
+      const folderFiles = s.files.filter((f) => {
+        const ff = f.appProperties?.folder || "/";
+        return ff === folderPath || ff.startsWith(folderPath + "/");
+      });
+      const fileIds = folderFiles.map((f) => f.id);
+
+      const toTrash: TrashedItem[] = folderFiles.map((f) => ({
+        file: f,
+        trashedAt: now,
+        originalFolder: f.appProperties?.folder || "/",
+      }));
+
+      const trashedFolder: TrashedFolder = {
+        path: folderPath,
+        trashedAt: now,
+        fileIds,
+      };
+
+      const remainingFiles = s.files.filter((f) => !fileIds.includes(f.id));
+      const remainingFolders = s.folders.filter(
+        (f) => f !== folderPath && !f.startsWith(folderPath + "/")
+      );
+
+      return {
+        files: remainingFiles,
+        folders: remainingFolders,
+        trash: [...s.trash, ...toTrash],
+        trashedFolders: [...s.trashedFolders, trashedFolder],
+        currentFolder:
+          s.currentFolder === folderPath ||
+          s.currentFolder.startsWith(folderPath + "/")
+            ? "/"
+            : s.currentFolder,
+      };
+    }),
+
   restoreFromTrash: (fileIds: string[]) =>
     set((s) => {
       const toRestore: DriveFile[] = [];
@@ -237,24 +287,78 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       };
     }),
 
+  restoreFolder: (folderPath: string) =>
+    set((s) => {
+      const tf = s.trashedFolders.find((f) => f.path === folderPath);
+      if (!tf) return s;
+
+      const toRestore: DriveFile[] = [];
+      const remainingTrash = s.trash.filter((t) => {
+        if (tf.fileIds.includes(t.file.id)) {
+          toRestore.push(t.file);
+          return false;
+        }
+        return true;
+      });
+
+      const newFiles = [...toRestore, ...s.files];
+      const restoredFolders = new Set([...s.folders, folderPath]);
+      // Also restore sub-folders from original file paths
+      toRestore.forEach((f) => {
+        const folder = f.appProperties?.folder || "/";
+        restoredFolders.add(folder);
+        const parts = folder.split("/").filter(Boolean);
+        let p = "";
+        for (const part of parts) {
+          p += `/${part}`;
+          restoredFolders.add(p);
+        }
+      });
+
+      return {
+        files: newFiles,
+        trash: remainingTrash,
+        trashedFolders: s.trashedFolders.filter((f) => f.path !== folderPath),
+        folders: Array.from(restoredFolders).sort(),
+      };
+    }),
+
   permanentlyDelete: (fileIds: string[]) =>
     set((s) => ({
       trash: s.trash.filter((t) => !fileIds.includes(t.file.id)),
     })),
 
+  permanentlyDeleteFolder: (folderPath: string) =>
+    set((s) => {
+      const tf = s.trashedFolders.find((f) => f.path === folderPath);
+      if (!tf) return s;
+      return {
+        trash: s.trash.filter((t) => !tf.fileIds.includes(t.file.id)),
+        trashedFolders: s.trashedFolders.filter((f) => f.path !== folderPath),
+      };
+    }),
+
   emptyTrash: () => {
-    const ids = get().trash.map((t) => t.file.id);
-    set({ trash: [] });
-    return ids;
+    const { trash, trashedFolders } = get();
+    const fileIds = trash.map((t) => t.file.id);
+    set({ trash: [], trashedFolders: [] });
+    return { fileIds };
   },
 
   cleanExpiredTrash: () => {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const expired = get().trash.filter((t) => t.trashedAt < sevenDaysAgo);
+    const state = get();
+    const expired = state.trash.filter((t) => t.trashedAt < sevenDaysAgo);
     const expiredIds = expired.map((t) => t.file.id);
-    if (expiredIds.length > 0) {
+    const expiredFolders = state.trashedFolders.filter(
+      (f) => f.trashedAt < sevenDaysAgo
+    );
+    if (expiredIds.length > 0 || expiredFolders.length > 0) {
       set((s) => ({
         trash: s.trash.filter((t) => t.trashedAt >= sevenDaysAgo),
+        trashedFolders: s.trashedFolders.filter(
+          (f) => f.trashedAt >= sevenDaysAgo
+        ),
       }));
     }
     return expiredIds;
@@ -267,33 +371,24 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const folderName = folderPath.split("/").pop() || "";
       const newPath =
         newParent === "/" ? `/${folderName}` : `${newParent}/${folderName}`;
-
       if (folderPath === newPath) return s;
       if (newPath.startsWith(folderPath + "/")) return s;
 
       const updatedFolders = s.folders.map((f) => {
         if (f === folderPath) return newPath;
-        if (f.startsWith(folderPath + "/")) {
+        if (f.startsWith(folderPath + "/"))
           return newPath + f.slice(folderPath.length);
-        }
         return f;
       });
-
       const updatedFiles = s.files.map((f) => {
         const ff = f.appProperties?.folder || "/";
         if (ff === folderPath || ff.startsWith(folderPath + "/")) {
           const newFolder =
-            ff === folderPath
-              ? newPath
-              : newPath + ff.slice(folderPath.length);
-          return {
-            ...f,
-            appProperties: { ...f.appProperties, folder: newFolder },
-          };
+            ff === folderPath ? newPath : newPath + ff.slice(folderPath.length);
+          return { ...f, appProperties: { ...f.appProperties, folder: newFolder } };
         }
         return f;
       });
-
       return {
         folders: [...new Set(["/", ...updatedFolders])].sort(),
         files: updatedFiles,
@@ -311,19 +406,14 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const folderName = folderPath.split("/").pop() || "";
       const newPath =
         newParent === "/" ? `/${folderName}` : `${newParent}/${folderName}`;
-
       if (newPath.startsWith(folderPath + "/")) return s;
 
       const newFolders: string[] = [];
       s.folders.forEach((f) => {
         if (f === folderPath) newFolders.push(newPath);
-        else if (f.startsWith(folderPath + "/")) {
+        else if (f.startsWith(folderPath + "/"))
           newFolders.push(newPath + f.slice(folderPath.length));
-        }
       });
-
-      return {
-        folders: [...new Set([...s.folders, ...newFolders])].sort(),
-      };
+      return { folders: [...new Set([...s.folders, ...newFolders])].sort() };
     }),
 }));

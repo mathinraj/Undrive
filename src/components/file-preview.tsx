@@ -2,35 +2,54 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import {
+  Download,
+  Loader2,
+  X,
+  Trash2,
+  FolderInput,
+  Folder,
+  Calendar,
+  HardDrive,
+  FileType,
+} from "lucide-react";
 import { downloadFile } from "@/lib/drive";
 import type { DriveFile } from "@/lib/drive";
-import { isPreviewable, formatFileSize, formatDate } from "@/lib/file-utils";
+import {
+  getFileIcon,
+  isPreviewable,
+  formatFileSize,
+  formatDate,
+} from "@/lib/file-utils";
 import { toast } from "sonner";
 
-interface FilePreviewProps {
+interface FileDetailPanelProps {
   file: DriveFile | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, name: string) => void;
 }
 
-export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
+export function FileDetailPanel({
+  file,
+  onClose,
+  onDelete,
+  onMove,
+}: FileDetailPanelProps) {
   const { data: session } = useSession();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!file || !open || !session?.accessToken) return;
+    if (!file || !session?.accessToken) return;
 
     const previewType = isPreviewable(file.mimeType);
-    if (!previewType) return;
+    if (!previewType) {
+      setBlobUrl(null);
+      return;
+    }
 
     let url: string | null = null;
     setLoading(true);
@@ -47,7 +66,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
       if (url) URL.revokeObjectURL(url);
       setBlobUrl(null);
     };
-  }, [file, open, session]);
+  }, [file?.id, session]);
 
   const handleDownload = async () => {
     if (!file || !session?.accessToken) return;
@@ -67,65 +86,140 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
 
   if (!file) return null;
 
+  const Icon = getFileIcon(file.mimeType);
   const previewType = isPreviewable(file.mimeType);
+  const folder = file.appProperties?.folder || "/";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between gap-4 pr-8">
-            <span className="truncate">{file.name}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-2"
-              onClick={handleDownload}
-            >
-              <Download className="h-3.5 w-3.5" />
-              Download
-            </Button>
-          </DialogTitle>
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <span>{formatFileSize(file.size)}</span>
-            <span>{formatDate(file.createdTime)}</span>
-            <span>{file.mimeType}</span>
+    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-96 bg-background border-l shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
+          <h2 className="text-sm font-semibold truncate">{file.name}</h2>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Preview area */}
+      <div className="flex-1 overflow-auto">
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        </DialogHeader>
+        )}
 
-        <div className="flex-1 overflow-auto min-h-0">
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {!loading && previewType === "image" && blobUrl && (
+        {!loading && previewType === "image" && blobUrl && (
+          <div className="p-4">
             <img
               src={blobUrl}
               alt={file.name}
-              className="max-w-full max-h-[60vh] mx-auto rounded-lg object-contain"
+              className="w-full rounded-lg object-contain max-h-[40vh] bg-muted/30"
             />
-          )}
+          </div>
+        )}
 
-          {!loading && previewType === "pdf" && blobUrl && (
+        {!loading && previewType === "pdf" && blobUrl && (
+          <div className="p-4">
             <iframe
               src={blobUrl}
               title={file.name}
-              className="w-full h-[60vh] rounded-lg border"
+              className="w-full h-[40vh] rounded-lg border"
             />
-          )}
+          </div>
+        )}
 
-          {!loading && !previewType && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
-              <p>Preview not available for this file type.</p>
-              <Button onClick={handleDownload} className="gap-2">
-                <Download className="h-4 w-4" />
-                Download File
-              </Button>
-            </div>
-          )}
+        {!loading && !previewType && (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+            <Icon className="h-16 w-16 opacity-30" />
+            <p className="text-sm">No preview available</p>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* File details */}
+        <div className="p-4 space-y-4">
+          <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+            Details
+          </h3>
+          <div className="space-y-3">
+            <DetailRow
+              icon={<FileType className="h-4 w-4" />}
+              label="Type"
+              value={file.mimeType}
+            />
+            <DetailRow
+              icon={<HardDrive className="h-4 w-4" />}
+              label="Size"
+              value={formatFileSize(file.size)}
+            />
+            <DetailRow
+              icon={<Calendar className="h-4 w-4" />}
+              label="Uploaded"
+              value={formatDate(file.createdTime)}
+            />
+            <DetailRow
+              icon={<Calendar className="h-4 w-4" />}
+              label="Modified"
+              value={formatDate(file.modifiedTime)}
+            />
+            <DetailRow
+              icon={<Folder className="h-4 w-4 text-violet-400" />}
+              label="Location"
+              value={folder === "/" ? "My Drive" : folder}
+            />
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      {/* Action buttons */}
+      <div className="p-4 border-t space-y-2">
+        <Button className="w-full gap-2" onClick={handleDownload}>
+          <Download className="h-4 w-4" />
+          Download
+        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
+            onClick={() => onMove(file.id, file.name)}
+          >
+            <FolderInput className="h-4 w-4" />
+            Move
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 gap-2 text-destructive"
+            onClick={() => onDelete(file.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-muted-foreground mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm break-all">{value}</p>
+      </div>
+    </div>
   );
 }

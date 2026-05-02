@@ -47,7 +47,7 @@ import {
   formatDate,
   isPreviewable,
 } from "@/lib/file-utils";
-import { FilePreview } from "./file-preview";
+import { FileDetailPanel } from "./file-preview";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -72,11 +72,11 @@ export function FileBrowser() {
     moveToTrash,
     moveFolderTo,
     copyFolderTo,
+    selectedFile,
+    setSelectedFile,
   } = store;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -232,11 +232,10 @@ export function FileBrowser() {
             })
           )
         );
-        moveToTrash(folderFiles.map((f) => f.id));
       }
 
-      removeFolder(folderPath);
-      toast.success("Folder deleted");
+      store.trashFolder(folderPath);
+      toast.success("Folder moved to trash");
     } catch {
       toast.error("Failed to delete folder");
     } finally {
@@ -384,12 +383,7 @@ export function FileBrowser() {
   };
 
   const handleFileClick = (file: DriveFile) => {
-    if (isPreviewable(file.mimeType)) {
-      setPreviewFile(file);
-      setShowPreview(true);
-    } else {
-      handleDownloadFile(file);
-    }
+    setSelectedFile(file);
   };
 
   const cycleSortField = () => {
@@ -711,7 +705,28 @@ export function FileBrowser() {
         </div>
       )}
 
-      <FilePreview file={previewFile} open={showPreview} onOpenChange={setShowPreview} />
+      {/* File detail panel */}
+      {selectedFile && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={() => setSelectedFile(null)}
+          />
+          <FileDetailPanel
+            file={selectedFile}
+            onClose={() => setSelectedFile(null)}
+            onDelete={(id) => {
+              setDeleteTargets([id]);
+              setShowDeleteConfirm(true);
+              setSelectedFile(null);
+            }}
+            onMove={(id, name) => {
+              setMoveTarget({ fileId: id, fileName: name });
+              setSelectedFile(null);
+            }}
+          />
+        </>
+      )}
 
       {/* Trash file confirm */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

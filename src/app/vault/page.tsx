@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { VaultHeader } from "@/components/vault-header";
 import { FolderSidebar } from "@/components/folder-sidebar";
 import { FileBrowser } from "@/components/file-browser";
+import { TrashView } from "@/components/trash-view";
 import {
   useFileUpload,
   DropOverlay,
@@ -29,7 +30,7 @@ export default function VaultPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const store = useVaultStore();
-  const { setFiles, setQuota, setFolders, isLoading, setIsLoading } = store;
+  const { setFiles, setQuota, isLoading, setIsLoading } = store;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { openFilePicker, processFiles, HiddenInput } = useFileUpload();
 
@@ -42,8 +43,7 @@ export default function VaultPage() {
         getStorageQuota(session.accessToken),
         loadFolderRegistry(session.accessToken),
       ]);
-      setFolders(savedFolders);
-      setFiles(files);
+      setFiles(files, savedFolders);
       setQuota(quota);
     } catch (err) {
       if (session.error === "RefreshAccessTokenError") {
@@ -56,7 +56,7 @@ export default function VaultPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [session, setFiles, setQuota, setFolders, setIsLoading, router]);
+  }, [session, setFiles, setQuota, setIsLoading, router]);
 
   // Auto-clean expired trash items (>7 days) on load
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function VaultPage() {
 
         <DropOverlay processFiles={processFiles}>
           <main className="p-4 lg:p-6 space-y-4 overflow-auto min-h-[calc(100vh-3.5rem)]">
-            <FileBrowser />
+            {store.activeView === "trash" ? <TrashView /> : <FileBrowser />}
           </main>
         </DropOverlay>
       </div>
