@@ -52,7 +52,7 @@ export default function LandingPage() {
     name: "Undrive",
     description:
       "Hidden file storage inside your own Google Drive. Invisible from Drive UI, accessible only through Undrive.",
-    url: "https://undrive.app",
+    url: "https://undrive-app.vercel.app",
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "Web",
     offers: {

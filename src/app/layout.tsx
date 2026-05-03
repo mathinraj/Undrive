@@ -15,7 +15,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://undrive.app"),
+  metadataBase: new URL("https://undrive-app.vercel.app"),
+  verification: {
+    google: "7OHgQl0_ZtSYxF2eXQIzCUngjx1qjT4jGzC4Nbg8K-Q",
+  },
   title: {
     default: "Undrive — Your Drive, unseen.",
     template: "%s | Undrive",
@@ -37,7 +40,7 @@ export const metadata: Metadata = {
     title: "Undrive — Your Drive, unseen.",
     description:
       "Hidden file storage inside your own Google Drive. Invisible, private, and free.",
-    url: "https://undrive.app",
+    url: "https://undrive-app.vercel.app",
     siteName: "Undrive",
     locale: "en_US",
     type: "website",

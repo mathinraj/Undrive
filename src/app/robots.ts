@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/vault", "/vault/", "/api/"],
     },
-    sitemap: "https://undrive.app/sitemap.xml",
+    sitemap: "https://undrive-app.vercel.app/sitemap.xml",
   };
 }

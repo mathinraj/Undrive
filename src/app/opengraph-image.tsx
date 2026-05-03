@@ -111,7 +111,7 @@ export default async function OgImage() {
               fontSize: "18px",
             }}
           >
-            undrive.app
+            undrive-app.vercel.app
           </div>
         </div>
       </div>
