@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg4c" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6D28D9"/>
-      <stop offset="100%" stop-color="#1E1042"/>
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#0F1D4A"/>
     </linearGradient>
     <filter id="drop4c">
       <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/>
@@ -35,7 +35,7 @@
     <!-- Bold slash -->
     <line x1="-38" y1="28" x2="38" y2="-28" stroke="white" stroke-width="14" stroke-linecap="round"/>
     <!-- Background-colored slash to "cut" the iris -->
-    <line x1="-38" y1="28" x2="38" y2="-28" stroke="#4A208A" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-38" y1="28" x2="38" y2="-28" stroke="#1E3A8A" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
     <!-- White slash on top again for crispness -->
     <line x1="-38" y1="28" x2="38" y2="-28" stroke="white" stroke-width="14" stroke-linecap="round"/>
   </g>

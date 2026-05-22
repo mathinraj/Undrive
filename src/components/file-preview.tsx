@@ -167,7 +167,7 @@ export function FileDetailPanel({
               value={formatDate(file.modifiedTime)}
             />
             <DetailRow
-              icon={<Folder className="h-4 w-4 text-violet-400" />}
+              icon={<Folder className="h-4 w-4 text-blue-400" />}
               label="Location"
               value={folder === "/" ? "My Drive" : folder}
             />

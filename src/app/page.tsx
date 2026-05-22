@@ -98,7 +98,7 @@ export default function LandingPage() {
 
               <h1 className="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
                 Your Drive,{" "}
-                <span className="bg-gradient-to-r from-violet-500 to-violet-700 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">
                   unseen.
                 </span>
               </h1>
@@ -150,8 +150,8 @@ export default function LandingPage() {
                     key={step.title}
                     className="flex flex-col items-center text-center space-y-4 rounded-xl border bg-card p-8"
                   >
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-500/10">
-                      <step.icon className="h-7 w-7 text-violet-500" />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10">
+                      <step.icon className="h-7 w-7 text-blue-500" />
                     </div>
                     <h3 className="text-lg font-semibold">{step.title}</h3>
                     <p className="text-sm text-muted-foreground">{step.desc}</p>

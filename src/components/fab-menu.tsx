@@ -60,8 +60,8 @@ export function FabMenu({ onUploadClick }: FabMenuProps) {
               className="flex items-center gap-3 rounded-full bg-card border shadow-lg pl-4 pr-3 py-2.5 hover:bg-muted transition-colors"
             >
               <span className="text-sm font-medium">Upload file</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10">
-                <Upload className="h-4 w-4 text-violet-500" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10">
+                <Upload className="h-4 w-4 text-blue-500" />
               </div>
             </button>
             <button
@@ -72,8 +72,8 @@ export function FabMenu({ onUploadClick }: FabMenuProps) {
               className="flex items-center gap-3 rounded-full bg-card border shadow-lg pl-4 pr-3 py-2.5 hover:bg-muted transition-colors"
             >
               <span className="text-sm font-medium">New folder</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10">
-                <FolderPlus className="h-4 w-4 text-violet-500" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10">
+                <FolderPlus className="h-4 w-4 text-blue-500" />
               </div>
             </button>
           </div>
@@ -83,7 +83,7 @@ export function FabMenu({ onUploadClick }: FabMenuProps) {
         <button
           onClick={() => setOpen(!open)}
           className={cn(
-            "flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition-all hover:bg-violet-700 active:scale-95",
+            "flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-all hover:bg-blue-700 active:scale-95",
             open && "rotate-45"
           )}
         >

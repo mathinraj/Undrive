@@ -426,7 +426,7 @@ export function FileBrowser() {
                   ? "font-medium text-foreground"
                   : "text-muted-foreground",
                 breadcrumbDropTarget === crumb.path &&
-                  "ring-2 ring-violet-500 bg-violet-500/10"
+                  "ring-2 ring-blue-500 bg-blue-500/10"
               )}
             >
               {crumb.label}
@@ -536,7 +536,7 @@ export function FileBrowser() {
                     )}
                     onClick={() => setCurrentFolder(fp)}
                   >
-                    <Folder className="h-8 w-8 text-violet-400 shrink-0" />
+                    <Folder className="h-8 w-8 text-blue-400 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{name}</p>
                       <p className="text-[10px] text-muted-foreground">
@@ -602,7 +602,7 @@ export function FileBrowser() {
                     )}
                     onClick={() => setCurrentFolder(fp)}
                   >
-                    <Folder className="h-5 w-5 shrink-0 text-violet-400" />
+                    <Folder className="h-5 w-5 shrink-0 text-blue-400" />
                     <span className="flex-1 truncate text-sm font-medium">{name}</span>
                     <span className="text-xs text-muted-foreground w-20 text-right">
                       {count} item{count !== 1 ? "s" : ""}
@@ -654,8 +654,8 @@ export function FileBrowser() {
                 const Icon = getFileIcon(file.mimeType);
                 const isSelected = selected.has(file.id);
                 return (
-                  <div key={file.id} className={cn("group relative flex flex-col items-center gap-2 rounded-xl border p-4 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-violet-500 bg-violet-500/5")} onClick={() => handleFileClick(file)}>
-                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 accent-violet-500" />
+                  <div key={file.id} className={cn("group relative flex flex-col items-center gap-2 rounded-xl border p-4 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-blue-500 bg-blue-500/5")} onClick={() => handleFileClick(file)}>
+                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="absolute top-2 left-2 h-4 w-4 rounded border-muted-foreground/50 accent-blue-500" />
                     <DropdownMenu>
                       <DropdownMenuTrigger className="absolute top-1 right-1 h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer outline-none opacity-60 hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical className="h-4 w-4" />
@@ -680,8 +680,8 @@ export function FileBrowser() {
                 const Icon = getFileIcon(file.mimeType);
                 const isSelected = selected.has(file.id);
                 return (
-                  <div key={file.id} className={cn("group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-violet-500 bg-violet-500/5")} onClick={() => handleFileClick(file)}>
-                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="h-4 w-4 shrink-0 accent-violet-500" />
+                  <div key={file.id} className={cn("group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50", isSelected && "border-blue-500 bg-blue-500/5")} onClick={() => handleFileClick(file)}>
+                    <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(file.id); }} onClick={(e) => e.stopPropagation()} className="h-4 w-4 shrink-0 accent-blue-500" />
                     <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <span className="flex-1 truncate text-sm font-medium">{file.name}</span>
                     <span className="hidden sm:block text-xs text-muted-foreground w-20 text-right">{formatFileSize(file.size)}</span>
@@ -778,7 +778,7 @@ export function FileBrowser() {
           <div className="space-y-1 max-h-64 overflow-auto">
             {["/", ...folders.filter((f) => f !== "/" && f !== moveFolderTarget?.path && !f.startsWith((moveFolderTarget?.path || "") + "/"))].map((f) => (
               <Button key={f} variant="ghost" className="w-full justify-start gap-2" onClick={() => handleMoveFolderConfirm(f)}>
-                <Folder className="h-4 w-4 text-violet-400" />
+                <Folder className="h-4 w-4 text-blue-400" />
                 {f === "/" ? "My Drive (root)" : f}
               </Button>
             ))}
@@ -795,11 +795,11 @@ export function FileBrowser() {
           </DialogHeader>
           <div className="space-y-1 max-h-64 overflow-auto">
             <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => moveTarget && handleMoveFile(moveTarget.fileId, "/")}>
-              <Folder className="h-4 w-4 text-violet-400" /> My Drive (root)
+              <Folder className="h-4 w-4 text-blue-400" /> My Drive (root)
             </Button>
             {folders.filter((f) => f !== "/").map((f) => (
               <Button key={f} variant="ghost" className="w-full justify-start gap-2" onClick={() => moveTarget && handleMoveFile(moveTarget.fileId, f)}>
-                <Folder className="h-4 w-4 text-violet-400" /> {f}
+                <Folder className="h-4 w-4 text-blue-400" /> {f}
               </Button>
             ))}
           </div>

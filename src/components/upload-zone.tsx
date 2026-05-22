@@ -128,8 +128,8 @@ export function DropOverlay({
     >
       {children}
       {isDragging && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg border-2 border-dashed border-violet-500">
-          <div className="flex flex-col items-center gap-2 text-violet-500">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg border-2 border-dashed border-blue-500">
+          <div className="flex flex-col items-center gap-2 text-blue-500">
             <FileUp className="h-10 w-10" />
             <p className="text-lg font-medium">Drop files to upload</p>
           </div>

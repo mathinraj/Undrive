@@ -87,7 +87,7 @@ export function LockScreen() {
                 i < pin.length
                   ? error
                     ? "bg-destructive border-destructive"
-                    : "bg-violet-500 border-violet-500"
+                    : "bg-blue-500 border-blue-500"
                   : "border-muted-foreground/30"
               )}
             />

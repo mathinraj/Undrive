@@ -22,7 +22,7 @@ export function GetStartedButton() {
     <Button
       size="lg"
       onClick={() => signIn("google", { callbackUrl: "/vault" })}
-      className="gap-2 bg-violet-600 hover:bg-violet-700 text-white px-8"
+      className="gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8"
     >
       Get Started
       <ArrowRight className="h-4 w-4" />

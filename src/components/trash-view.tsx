@@ -271,7 +271,7 @@ export function TrashView() {
                   key={tf.path}
                   className="group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50"
                 >
-                  <Folder className="h-5 w-5 shrink-0 text-violet-400 opacity-50" />
+                  <Folder className="h-5 w-5 shrink-0 text-blue-400 opacity-50" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -325,14 +325,14 @@ export function TrashView() {
                   key={file.id}
                   className={cn(
                     "group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50",
-                    isSelected && "border-violet-500 bg-violet-500/5"
+                    isSelected && "border-blue-500 bg-blue-500/5"
                   )}
                 >
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleSelect(file.id)}
-                    className="h-4 w-4 shrink-0 accent-violet-500"
+                    className="h-4 w-4 shrink-0 accent-blue-500"
                   />
                   <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <div className="flex-1 min-w-0">

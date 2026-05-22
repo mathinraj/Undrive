@@ -123,7 +123,7 @@ export function FolderSidebar({
             {path === "/" ? (
               <HardDrive className="h-4 w-4 shrink-0" />
             ) : (
-              <Folder className="h-4 w-4 shrink-0 text-violet-400" />
+              <Folder className="h-4 w-4 shrink-0 text-blue-400" />
             )}
             <span className="truncate">{name}</span>
           </Button>
@@ -142,7 +142,7 @@ export function FolderSidebar({
   return (
     <div className={cn("flex flex-col gap-1 p-3", className)}>
       <DropdownMenu>
-        <DropdownMenuTrigger className="mb-3 flex h-10 w-full items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-medium text-white shadow-md hover:bg-violet-700 transition-colors cursor-pointer outline-none">
+        <DropdownMenuTrigger className="mb-3 flex h-10 w-full items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer outline-none">
           <Plus className="h-5 w-5" />
           New
         </DropdownMenuTrigger>
