@@ -1,143 +1,109 @@
-# Undrive
+<p align="center">
+  <img src="public/logo.svg" alt="Undrive" width="80" height="80" />
+</p>
 
-**Your Drive, unseen.**
+<h1 align="center">Undrive</h1>
 
-Store personal files in Google Drive's hidden `appDataFolder` — invisible from the Drive UI, accessible only through Undrive. Uses your own Google Drive storage quota. Zero server cost.
+<p align="center">
+  <strong>Your Drive, unseen.</strong><br/>
+  Hidden file storage inside your own Google Drive.
+</p>
 
-## What is this?
+<p align="center">
+  <a href="https://undrive-app.vercel.app">Live App</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#privacy">Privacy</a> · <a href="#faq">FAQ</a>
+</p>
 
-Google Drive has a special hidden folder called `appDataFolder` that apps can use to store data. Files in this folder:
+---
 
-- Don't appear in Google Drive's web UI, mobile app, or desktop sync
-- Don't show up in search within Google Drive
-- Use your existing Google Drive storage quota (15GB free)
-- Can only be accessed by the app that created them
+## What is Undrive?
 
-Undrive turns this into a personal hidden file vault.
+Undrive gives you a **private, invisible vault** inside your existing Google Drive. Files stored through Undrive are placed in a special hidden area — they don't show up anywhere in Google Drive's UI, search, mobile apps, or desktop sync.
+
+Only Undrive can see them. Your storage. Your files. Completely hidden.
+
+---
 
 ## Features
 
-- **Google Sign-In** — Authenticate with your Google account (only `drive.appdata` scope — we can't see your regular Drive files)
-- **Upload files** — Drag-and-drop or file picker with progress tracking
-- **File browser** — Grid/list views, search, sort by name/date/size
-- **Virtual folders** — Organize files into folders (stored as metadata, not actual Drive folders)
-- **Preview** — View images and PDFs directly in the app
-- **Download** — Download files with their original filenames
-- **Bulk actions** — Select multiple files for download or delete
-- **Export vault** — Download everything as a ZIP
-- **Storage quota** — See how much Drive space you're using
-- **Dark mode** — Light, dark, and system theme support
-- **Responsive** — Works on desktop and mobile
-- **Zero server cost** — Files transfer directly between your browser and Google. No data passes through our backend.
+**Store & Organize**
+- Upload files via drag-and-drop or file picker with real-time progress
+- Organize with virtual folders — nest, move, copy, and rename
+- Grid and list views with search, sort, and bulk actions
 
-## Tech Stack
+**Access Anywhere**
+- Preview images and PDFs directly in the browser
+- Download individual files or export your entire vault as a ZIP
+- Responsive design — works seamlessly on desktop, tablet, and mobile
 
-- [Next.js 16](https://nextjs.org/) (App Router)
-- [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
-- [NextAuth v4](https://next-auth.js.org/) (Google OAuth)
-- [Zustand](https://zustand.docs.pmnd.rs/) (state management)
-- [Google Drive API v3](https://developers.google.com/drive/api/v3/about-sdk) (appDataFolder)
-- [Lucide React](https://lucide.dev/) (icons)
-- [JSZip](https://stuk.github.io/jszip/) (vault export)
+**Stay in Control**
+- See your Google Drive storage usage at a glance
+- Trash with 7-day auto-delete and one-click restore
+- PIN lock for an extra layer of on-device protection
+- Light, dark, and system theme support
 
-## Getting Started
+**Zero Trust Architecture**
+- Files transfer directly between your browser and Google — nothing passes through any server
+- Only `drive.appdata` scope is requested — Undrive cannot see or touch your regular Drive files
+- No accounts, no databases, no analytics on your files
 
-### Prerequisites
+---
 
-- Node.js 18+
-- A Google Cloud Project with the Google Drive API enabled
-- An OAuth 2.0 Client ID (Web Application)
+## How It Works
 
-### 1. Clone and install
+1. **Sign in with Google** — Authorize Undrive with minimal permissions (hidden app folder only).
+2. **Upload your files** — They're stored in Google Drive's invisible folder.
+3. **Access anytime** — Browse, preview, download, and manage your hidden files through Undrive.
 
-```bash
-git clone <your-repo-url>
-cd undrive
-npm install
-```
+All files use your existing Google Drive storage quota (15 GB free, or whatever plan you have).
 
-### 2. Set up Google Cloud
+---
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use an existing one)
-3. Enable the **Google Drive API**
-4. Go to **APIs & Services > OAuth consent screen** — configure as External, app name "Undrive"
-5. Go to **APIs & Services > Credentials** — create an **OAuth 2.0 Client ID** (Web Application)
-6. Add authorized JavaScript origin: `http://localhost:3000`
-7. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+## Privacy
 
-### 3. Configure environment
+| Concern | Answer |
+|---|---|
+| **Does Undrive store my files?** | No. Files go directly from your browser to Google Drive. |
+| **Can Undrive see my regular Drive files?** | No. We only request the `drive.appdata` scope. |
+| **Is there a backend server?** | Only for authentication. File operations happen entirely client-side. |
+| **Can Google see my files?** | Google stores the raw data. End-to-end encryption is planned for Phase 2. |
 
-Copy the example env file and fill in your credentials:
+---
 
-```bash
-cp .env.example .env.local
-```
+## FAQ
 
-```env
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-NEXTAUTH_SECRET=run-openssl-rand-base64-32
-NEXTAUTH_URL=http://localhost:3000
-```
+**Does this count toward my storage?**
+Yes. Files in this invisible folder use your normal Google Drive quota.
 
-Generate a secret:
+**Can I see these files in Google Drive?**
+No. The hidden folder is completely invisible from Drive's web UI, mobile apps, and desktop sync.
 
-```bash
-openssl rand -base64 32
-```
+**What happens if I uninstall Undrive?**
+Your files remain in the hidden folder. Reconnect Undrive anytime to access them again. You can also revoke access from [Google Account settings](https://myaccount.google.com/permissions), which deletes the hidden data.
 
-### 4. Run
+**Is my data safe?**
+Your files are as safe as anything in Google Drive. Undrive never stores, logs, or processes your files.
 
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Deploy to Vercel
-
-1. Push to GitHub
-2. Import the repo at [vercel.com/new](https://vercel.com/new)
-3. Add environment variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET` (do **not** set `NEXTAUTH_URL` — Vercel handles it automatically)
-4. Deploy
-5. Add your Vercel URL to Google OAuth authorized origins and redirect URIs
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── page.tsx                # Landing page
-│   ├── layout.tsx              # Root layout
-│   ├── api/auth/[...nextauth]/ # NextAuth route
-│   └── vault/
-│       ├── page.tsx            # File browser
-│       └── settings/page.tsx   # Settings
-├── components/
-│   ├── vault-header.tsx        # Header with user menu + quota
-│   ├── folder-sidebar.tsx      # Folder navigation
-│   ├── file-browser.tsx        # Grid/list file browser
-│   ├── upload-zone.tsx         # Drag-and-drop upload
-│   ├── file-preview.tsx        # Image/PDF preview modal
-│   └── ui/                     # shadcn/ui components
-├── lib/
-│   ├── auth.ts                 # NextAuth config + token refresh
-│   ├── drive.ts                # Google Drive API wrapper
-│   ├── store.ts                # Zustand store
-│   └── file-utils.ts           # File icons, formatting
-└── types/
-    └── next-auth.d.ts          # Session type augmentation
-```
+---
 
 ## Roadmap
 
-- **Phase 1** (current): Web app with hidden Drive storage
-- **Phase 2**: End-to-end encryption (AES-256-GCM, vault password, zero-knowledge)
-- **Phase 3**: Chrome extension (context menu "Save to Undrive", popup, Drive page integration)
+| Phase | Status | Description |
+|---|---|---|
+| **Phase 1** | Live | Web app with hidden Drive storage, folders, preview, PIN lock |
+| **Phase 2** | Planned | End-to-end encryption (AES-256-GCM, vault password, zero-knowledge) |
+| **Phase 3** | Planned | Chrome extension with context menu, popup, and Drive page integration |
 
-See [prompt.md](./prompt.md) for the full build specification.
+---
 
-## License
 
-MIT
+
+
+## Built With
+
+[Next.js](https://nextjs.org/) · [Tailwind CSS](https://tailwindcss.com/) · [shadcn/ui](https://ui.shadcn.com/) · [Google Drive API](https://developers.google.com/drive) · [Zustand](https://zustand.docs.pmnd.rs/) · [Lucide](https://lucide.dev/)
+
+---
+
+<p align="center">
+  <sub>Made with care. Your files, your drive, your privacy.</sub>
+</p>
